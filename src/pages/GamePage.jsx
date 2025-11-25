@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { getDistinctThemes, getCards } from '../services/cardService.js';
+import { AuthContext } from '../contexts/AuthContext'; // <--- Importando Contexto de Auth
+import api from '../services/api'; // <--- Importando API para salvar resultado
 import MemoryCardComponent from '../components/MemoryCardComponent';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
@@ -10,7 +12,6 @@ const GAME_CONFIG = {
   medium: { pairs: 8, label: 'Médio (8 Pares)' },
   hard: { pairs: 10, label: 'Difícil (10 Pares)' },
 };
-// ------------------------------
 
 // Função para embaralhar
 const shuffleArray = (array) => {
@@ -18,31 +19,31 @@ const shuffleArray = (array) => {
 };
 
 function GamePage() {
+  const { user } = useContext(AuthContext); // <--- Acessando usuário logado
+  
   const [cards, setCards] = useState([]);
   const [flipped, setFlipped] = useState([]); 
   const [matched, setMatched] = useState([]); 
   const [moves, setMoves] = useState(0);
 
-  // --- Novos Estados ---
-  const [gameState, setGameState] = useState('loading'); // 'loading', 'themeSelection', 'difficultySelection', 'playing', 'won'
+  // Estados de Controle
+  const [gameState, setGameState] = useState('loading');
   const [availableThemes, setAvailableThemes] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState(null);
   const [error, setError] = useState(null);
   
-  // Estados do Timer
+  // Timer
   const [timer, setTimer] = useState(0);
-  // Usamos useRef para guardar o ID do intervalo, para não causar re-renderizações
   const timerIntervalRef = useRef(null); 
-  // --------------------
 
-  // 1. Efeito para buscar os temas disponíveis na primeira carga
+  // 1. Carregar Temas
   useEffect(() => {
     const loadThemes = async () => {
       setGameState('loading');
       setError(null);
       try {
-        const response = await getDistinctThemes(); // Chama a API de temas
+        const response = await getDistinctThemes();
         if (response.data.length === 0) {
           setError("Nenhuma carta cadastrada. Adicione cartas na área de Admin.");
         } else {
@@ -54,29 +55,24 @@ function GamePage() {
         setGameState('error');
       }
     };
-    
     loadThemes();
-  }, []); // Roda apenas uma vez
+  }, []);
 
-  // 2. Limpa o timer quando o componente é desmontado
+  // 2. Limpeza do Timer
   useEffect(() => {
     return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, []);
 
-  // 3. Função chamada ao selecionar o TEMA
   const handleThemeSelect = (theme) => {
     setSelectedTheme(theme);
-    setGameState('difficultySelection'); // Avança para a tela de dificuldade
+    setGameState('difficultySelection');
   };
 
-  // 4. Função chamada ao selecionar a DIFICULDADE (inicia o jogo)
   const startGame = async (difficultyKey) => {
     setGameState('loading');
-    setSelectedDifficulty(difficultyKey); // Salva a dificuldade
+    setSelectedDifficulty(difficultyKey);
     setError(null);
     setCards([]);
     setFlipped([]);
@@ -85,16 +81,14 @@ function GamePage() {
 
     try {
       const { pairs } = GAME_CONFIG[difficultyKey];
-      const response = await getCards({ theme: selectedTheme }); // Busca cartas do tema
+      const response = await getCards({ theme: selectedTheme });
       
-      // Verifica se há cartas suficientes para a dificuldade
       if (response.data.length < pairs) {
-         setError(`O tema "${selectedTheme}" não tem cartas suficientes (${pairs}) para este modo. Cadastre mais cartas ou escolha "Fácil".`);
-         setGameState('difficultySelection'); // Volta para a tela de dificuldade
+         setError(`O tema "${selectedTheme}" não tem cartas suficientes (${pairs}).`);
+         setGameState('difficultySelection');
          return;
       }
 
-      // Pega o número de pares necessários
       const pairsDeck = response.data.slice(0, pairs);
       const gameDeck = [...pairsDeck, ...pairsDeck].map((card, i) => ({
         ...card,
@@ -103,15 +97,12 @@ function GamePage() {
       setCards(shuffleArray(gameDeck));
       setGameState('playing');
 
-      // --- Inicia o Timer ---
+      // Inicia Timer
       setTimer(0);
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = setInterval(() => {
         setTimer(prev => prev + 1);
       }, 1000);
-      // ---------------------
 
     } catch (err) {
       setError("Falha ao carregar o jogo.");
@@ -119,9 +110,7 @@ function GamePage() {
     }
   };
 
-  // 5. Lógica de clique no card (atualizada)
   const handleCardClick = (index) => {
-    // Não faz nada se o jogo não está ativo, ou se já tem 2 viradas, etc.
     if (gameState !== 'playing' || flipped.length === 2 || flipped.includes(index) || matched.includes(cards[index].name)) {
       return; 
     }
@@ -132,20 +121,15 @@ function GamePage() {
     if (newFlipped.length === 2) {
       setMoves(moves + 1); 
       const [firstIndex, secondIndex] = newFlipped;
+      
       if (cards[firstIndex].name === cards[secondIndex].name) {
         const newMatched = [...matched, cards[firstIndex].name];
         setMatched(newMatched);
         setFlipped([]);
         
-        // Checa se venceu
+        // Checa Vitória
         if (newMatched.length === cards.length / 2) {
-          setGameState('won');
-          // --- Para o Timer ---
-          if (timerIntervalRef.current) {
-            clearInterval(timerIntervalRef.current);
-            timerIntervalRef.current = null;
-          }
-          // --------------------
+          handleGameWin(); // <--- Chama função de vitória
         }
       } else {
         setTimeout(() => {
@@ -155,13 +139,34 @@ function GamePage() {
     }
   };
 
-  // 6. Função para voltar à seleção de temas
+  // --- Lógica de Vitória e Salvamento ---
+  const handleGameWin = () => {
+      setGameState('won');
+      
+      // Para o Timer
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+
+      // Se usuário estiver logado, salva no banco
+      if (user && user.id) {
+          const gameData = {
+              win: true,
+              moves: moves + 1, // +1 pois o state 'moves' ainda não atualizou na renderização
+              time: timer,
+              difficulty: selectedDifficulty,
+              theme: selectedTheme
+          };
+
+          api.post(`/users/${user.id}/game-result`, gameData)
+             .then(() => console.log("Resultado salvo com sucesso!"))
+             .catch(err => console.error("Erro ao salvar resultado:", err));
+      }
+  };
+
   const resetToThemeSelection = () => {
-    // Para o timer se estiver rodando
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     setGameState('themeSelection');
     setSelectedTheme(null);
     setSelectedDifficulty(null);
@@ -169,54 +174,37 @@ function GamePage() {
     setError(null);
   };
 
-  // 7. Renderização (o que o usuário vê)
   const renderContent = () => {
-    if (gameState === 'loading') {
-      return <LoadingSpinner />;
-    }
+    if (gameState === 'loading') return <LoadingSpinner />;
+    if (error && gameState !== 'difficultySelection') return <p className="error-message">{error}</p>;
     
-    if (error && gameState !== 'difficultySelection') {
-      return <p className="error-message">{error}</p>;
-    }
-    
-    // --- TELA 1: SELEÇÃO DE TEMA ---
+    // --- TELA 1: TEMA ---
     if (gameState === 'themeSelection') {
       return (
         <div className="theme-selection">
-          <h2>Escolha um Tema para Jogar!</h2>
+          <h2>Escolha um Tema</h2>
           <div className="theme-buttons">
-            {availableThemes.length > 0 ? (
-              availableThemes.map(theme => (
-                <Button key={theme} onClick={() => handleThemeSelect(theme)}>
-                  {theme}
-                </Button>
-              ))
-            ) : (
-              <p>Nenhum tema encontrado. Cadastre cartas no Admin.</p>
-            )}
+            {availableThemes.map(theme => (
+                <Button key={theme} onClick={() => handleThemeSelect(theme)}>{theme}</Button>
+            ))}
           </div>
         </div>
       );
     }
 
-    // --- TELA 2: SELEÇÃO DE DIFICULDADE ---
+    // --- TELA 2: DIFICULDADE ---
     if (gameState === 'difficultySelection') {
       return (
         <div className="theme-selection">
           <h2>Tema: {selectedTheme}</h2>
-          <h3>Escolha a Dificuldade:</h3>
-          {/* Mostra o erro de "cartas insuficientes" aqui */}
+          <h3>Dificuldade:</h3>
           {error && <p className="error-message">{error}</p>}
           <div className="theme-buttons">
             {Object.keys(GAME_CONFIG).map(key => (
-              <Button key={key} onClick={() => startGame(key)}>
-                {GAME_CONFIG[key].label}
-              </Button>
+              <Button key={key} onClick={() => startGame(key)}>{GAME_CONFIG[key].label}</Button>
             ))}
           </div>
-          <Button onClick={resetToThemeSelection} variant="secondary" style={{marginTop: '2.0rem'}}>
-            Voltar
-          </Button>
+          <Button onClick={resetToThemeSelection} variant="secondary" style={{marginTop: '2rem'}}>Voltar</Button>
         </div>
       );
     }
@@ -225,13 +213,17 @@ function GamePage() {
     if (gameState === 'playing') {
       return (
         <div>
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '2.0 rem', alignItems: 'center', marginBottom: '1rem'}}>
-            <Button onClick={resetToThemeSelection} variant="secondary">Voltar (Mudar Tema)</Button>
-            <h3 style={{margin: 0}}>Tema: {selectedTheme}</h3>
-            <h3 style={{margin: 0, color: '#007bff'}}>Tempo: {timer}s</h3>
-            <h3 style={{margin: 0, color: '#dc3545'}}>Jogadas: {moves}</h3>
+          {/* AQUI: Usamos a classe CSS 'game-stats-bar' para responsividade */}
+          <div className="game-stats-bar">
+            <Button onClick={resetToThemeSelection} variant="secondary">Voltar</Button>
+            
+            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center'}}>
+                <h3 style={{margin: 0}}>Tema: {selectedTheme}</h3>
+                <h3 style={{margin: 0, color: '#007bff'}}>Tempo: {timer}s</h3>
+                <h3 style={{margin: 0, color: '#dc3545'}}>Jogadas: {moves}</h3>
+            </div>
           </div>
-          
+
           <div className="game-board">
             {cards.map((card, index) => (
               <MemoryCardComponent
@@ -249,22 +241,25 @@ function GamePage() {
     // --- TELA 4: VITÓRIA ---
     if (gameState === 'won') {
        return (
-        <div className="theme-selection"> {/* Reutiliza o estilo de centralizar */}
+        <div className="theme-selection">
           <h2 className="success-message">Parabéns, você venceu!</h2>
-          <h3>Estatísticas da Partida:</h3>
-          <p><strong>Tema:</strong> {selectedTheme}</p>
-          <p><strong>Dificuldade:</strong> {GAME_CONFIG[selectedDifficulty].label}</p>
-          <p><strong>Tempo Final:</strong> {timer} segundos</p>
-          <p><strong>Total de Jogadas:</strong> {moves}</p>
-          <br/>
-          <Button onClick={resetToThemeSelection} variant="primary">
-            Jogar Novamente
-          </Button>
+          <div style={{margin: '1rem 0'}}>
+             <p><strong>Tempo:</strong> {timer} segundos</p>
+             <p><strong>Jogadas:</strong> {moves}</p>
+          </div>
+          
+          {/* Mensagem sobre salvamento */}
+          <p style={{fontSize: '0.9rem', color: user ? '#28a745' : '#6c757d'}}>
+              {user 
+                ? "Resultado salvo no seu perfil! 🏆" 
+                : "Faça login para salvar suas estatísticas na próxima vez."}
+          </p>
+
+          <Button onClick={resetToThemeSelection} variant="primary">Jogar Novamente</Button>
         </div>
       );
     }
-    
-    return null; // Caso de erro
+    return null;
   };
 
   return (

@@ -1,139 +1,102 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { getCards, deleteCard, getDistinctThemes } from '../services/cardService.js';
-import Button from '../components/Button'; 
-import LoadingSpinner from '../components/LoadingSpinner'; 
+import { getCards, deleteCard } from '../services/cardService.js';
+import { useNavigate } from 'react-router-dom';
+import Button from '../components/Button';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 function AdminCardListPage() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  const [themes, setThemes] = useState([]); 
-  const [selectedTheme, setSelectedTheme] = useState(''); 
+  const navigate = useNavigate();
 
-  // Função para buscar os dados (cartas E temas)
-  const fetchApiData = async (themeQuery = '') => {
-    setLoading(true);
-    setError(null);
+  // Função para buscar as cartas
+  const fetchCards = async () => {
     try {
-      const query = themeQuery ? { theme: themeQuery } : {};
-      
-      // 1. Busca as cartas
-      const cardsResponse = await getCards(query);
-      setCards(cardsResponse.data);
-      
-      // 2. Busca a lista de temas (CORREÇÃO AQUI)
-      // Verifica se precisa buscar os temas (se a lista estiver vazia ou se for uma recarga forçada)
-      if (themes.length === 0) {
-        const themesResponse = await getDistinctThemes(); // Nome corrigido
-        setThemes(themesResponse.data);
-      }
-      
+      setLoading(true);
+      const response = await getCards(); // Busca todas as cartas
+      setCards(response.data);
     } catch (err) {
+      setError('Erro ao carregar cartas.');
       console.error(err);
-      setError('Falha ao buscar os dados. Verifique se o back-end está rodando.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Roda na primeira vez que a página carrega
   useEffect(() => {
-    fetchApiData(); 
-  }, []); 
+    fetchCards();
+  }, []);
 
-  const handleFilter = () => {
-    fetchApiData(selectedTheme);
-  };
-  
-  const handleClearFilter = () => {
-    setSelectedTheme(''); 
-    fetchApiData(); // Busca todas as cartas sem filtro
-  };
-
+  // Função para deletar
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir esta carta?')) {
       try {
-        await deleteCard(id); 
-        // Remove a carta da lista local visualmente para não precisar recarregar tudo
-        setCards(prevCards => prevCards.filter(card => card.id !== id));
-        
-        // Atualiza a lista de temas (caso tenha excluído o último item de um tema)
-        // (CORREÇÃO AQUI TAMBÉM)
-        const themesResponse = await getDistinctThemes(); 
-        setThemes(themesResponse.data);
-
+        await deleteCard(id);
+        // Remove da lista visualmente sem precisar recarregar tudo
+        setCards(cards.filter(card => card.id !== id));
       } catch (err) {
-        console.error(err);
-        setError('Falha ao excluir a carta.');
+        alert('Erro ao excluir carta.');
       }
     }
   };
 
-  if (loading && cards.length === 0) return <LoadingSpinner />;
+  if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="admin-list-page">
-      <h2>Gerenciador de Cartas</h2>
-      <Link to="/admin/new">
-        <Button>Nova Carta</Button>
-      </Link>
-      
-      <div className="filter-section">
-        <select 
-          value={selectedTheme} 
-          onChange={(e) => setSelectedTheme(e.target.value)}
-          style={{ padding: '0.75rem', borderRadius: '5px', border: '1px solid #ccc', marginRight: '10px' }}
-        >
-          <option value="">Todos os Temas</option>
-          {themes.map((theme, index) => (
-            // Adicionei index como fallback da key caso o tema seja repetido ou nulo
-            <option key={theme || index} value={theme}>
-              {theme}
-            </option>
-          ))}
-        </select>
-        
-        <Button onClick={handleFilter}>Buscar</Button>
-        <Button onClick={handleClearFilter} variant="secondary">Limpar</Button>
+    <div className="admin-page">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2>Gerenciar Cartas</h2>
+        <Button variant="success" onClick={() => navigate('/admin/new')}>
+          + Nova Carta
+        </Button>
       </div>
-      
+
       {error && <p className="error-message">{error}</p>}
 
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Tema</th>
-            <th>Imagem</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cards.map(card => (
-            <tr key={card.id}>
-              <td>{card.name}</td>
-              <td>{card.theme}</td>
-              <td>
-                <img 
-                  src={card.imageUrl} 
-                  alt={card.name} 
-                  style={{ width: '50px', height: '50px', objectFit: 'cover' }} 
-                />
-              </td>
-              <td>
-                <Link to={`/admin/edit/${card.id}`}>
-                  <Button variant="secondary">Editar</Button>
-                </Link>
-                <Button variant="danger" onClick={() => handleDelete(card.id)}>
+      {cards.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
+          <h3>Nenhuma carta encontrada.</h3>
+          <p>Clique em "+ Nova Carta" para começar.</p>
+        </div>
+      ) : (
+        /* AQUI ESTÁ A MUDANÇA: Usamos a Grid em vez de Tabela */
+        <div className="admin-card-grid">
+          {cards.map((card) => (
+            <div key={card.id} className="admin-card-item">
+              {/* Imagem */}
+              <img 
+                src={card.imageUrl} 
+                alt={card.name} 
+                className="admin-card-image"
+                onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Sem+Imagem'; }} // Fallback se a imagem quebrar
+              />
+              
+              {/* Conteúdo */}
+              <div className="admin-card-content">
+                <h3 className="admin-card-title">{card.name}</h3>
+                <span className="admin-card-theme">{card.theme}</span>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="admin-card-actions">
+                <Button 
+                  variant="primary" 
+                  onClick={() => navigate(`/admin/edit/${card.id}`)}
+                >
+                  Editar
+                </Button>
+                <Button 
+                  variant="danger" 
+                  onClick={() => handleDelete(card.id)}
+                >
                   Excluir
                 </Button>
-              </td>
-            </tr>
+              </div>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 }
