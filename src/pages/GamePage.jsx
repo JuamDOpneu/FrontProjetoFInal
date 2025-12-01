@@ -1,43 +1,38 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { getDistinctThemes, getCards } from '../services/cardService.js';
-import { AuthContext } from '../contexts/AuthContext'; // <--- Importando Contexto de Auth
-import api from '../services/api'; // <--- Importando API para salvar resultado
+import { AuthContext } from '../contexts/AuthContext';
+import api from '../services/api';
 import MemoryCardComponent from '../components/MemoryCardComponent';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
 
-// --- CONFIGURAÇÃO DOS NÍVEIS ---
 const GAME_CONFIG = {
   easy: { pairs: 6, label: 'Fácil (6 Pares)' },
   medium: { pairs: 8, label: 'Médio (8 Pares)' },
   hard: { pairs: 10, label: 'Difícil (10 Pares)' },
 };
 
-// Função para embaralhar
 const shuffleArray = (array) => {
   return array.sort(() => Math.random() - 0.5);
 };
 
 function GamePage() {
-  const { user } = useContext(AuthContext); // <--- Acessando usuário logado
+  const { user } = useContext(AuthContext);
   
   const [cards, setCards] = useState([]);
-  const [flipped, setFlipped] = useState([]); 
-  const [matched, setMatched] = useState([]); 
+  const [flipped, setFlipped] = useState([]);
+  const [matched, setMatched] = useState([]);
   const [moves, setMoves] = useState(0);
 
-  // Estados de Controle
   const [gameState, setGameState] = useState('loading');
   const [availableThemes, setAvailableThemes] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState(null);
   const [error, setError] = useState(null);
   
-  // Timer
   const [timer, setTimer] = useState(0);
-  const timerIntervalRef = useRef(null); 
+  const timerIntervalRef = useRef(null);
 
-  // 1. Carregar Temas
   useEffect(() => {
     const loadThemes = async () => {
       setGameState('loading');
@@ -58,7 +53,6 @@ function GamePage() {
     loadThemes();
   }, []);
 
-  // 2. Limpeza do Timer
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -92,12 +86,11 @@ function GamePage() {
       const pairsDeck = response.data.slice(0, pairs);
       const gameDeck = [...pairsDeck, ...pairsDeck].map((card, i) => ({
         ...card,
-        uniqueId: i, 
+        uniqueId: i,
       }));
       setCards(shuffleArray(gameDeck));
       setGameState('playing');
 
-      // Inicia Timer
       setTimer(0);
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = setInterval(() => {
@@ -112,14 +105,14 @@ function GamePage() {
 
   const handleCardClick = (index) => {
     if (gameState !== 'playing' || flipped.length === 2 || flipped.includes(index) || matched.includes(cards[index].name)) {
-      return; 
+      return;
     }
 
     const newFlipped = [...flipped, index];
     setFlipped(newFlipped);
 
     if (newFlipped.length === 2) {
-      setMoves(moves + 1); 
+      setMoves(moves + 1);
       const [firstIndex, secondIndex] = newFlipped;
       
       if (cards[firstIndex].name === cards[secondIndex].name) {
@@ -127,9 +120,8 @@ function GamePage() {
         setMatched(newMatched);
         setFlipped([]);
         
-        // Checa Vitória
         if (newMatched.length === cards.length / 2) {
-          handleGameWin(); // <--- Chama função de vitória
+          handleGameWin();
         }
       } else {
         setTimeout(() => {
@@ -139,29 +131,26 @@ function GamePage() {
     }
   };
 
-  // --- Lógica de Vitória e Salvamento ---
   const handleGameWin = () => {
       setGameState('won');
       
-      // Para o Timer
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
 
-      // Se usuário estiver logado, salva no banco
       if (user && user.id) {
           const gameData = {
               win: true,
-              moves: moves + 1, // +1 pois o state 'moves' ainda não atualizou na renderização
+              moves: moves + 1,
               time: timer,
               difficulty: selectedDifficulty,
               theme: selectedTheme
           };
 
           api.post(`/users/${user.id}/game-result`, gameData)
-             .then(() => console.log("Resultado salvo com sucesso!"))
-             .catch(err => console.error("Erro ao salvar resultado:", err));
+              .then(() => console.log("Resultado salvo com sucesso!"))
+              .catch(err => console.error("Erro ao salvar resultado:", err));
       }
   };
 
@@ -178,7 +167,6 @@ function GamePage() {
     if (gameState === 'loading') return <LoadingSpinner />;
     if (error && gameState !== 'difficultySelection') return <p className="error-message">{error}</p>;
     
-    // --- TELA 1: TEMA ---
     if (gameState === 'themeSelection') {
       return (
         <div className="theme-selection">
@@ -192,7 +180,6 @@ function GamePage() {
       );
     }
 
-    // --- TELA 2: DIFICULDADE ---
     if (gameState === 'difficultySelection') {
       return (
         <div className="theme-selection">
@@ -209,11 +196,9 @@ function GamePage() {
       );
     }
     
-    // --- TELA 3: JOGANDO ---
     if (gameState === 'playing') {
       return (
         <div>
-          {/* AQUI: Usamos a classe CSS 'game-stats-bar' para responsividade */}
           <div className="game-stats-bar">
             <Button onClick={resetToThemeSelection} variant="secondary">Voltar</Button>
             
@@ -238,7 +223,6 @@ function GamePage() {
       );
     }
 
-    // --- TELA 4: VITÓRIA ---
     if (gameState === 'won') {
        return (
         <div className="theme-selection">
@@ -248,7 +232,6 @@ function GamePage() {
              <p><strong>Jogadas:</strong> {moves}</p>
           </div>
           
-          {/* Mensagem sobre salvamento */}
           <p style={{fontSize: '0.9rem', color: user ? '#28a745' : '#6c757d'}}>
               {user 
                 ? "Resultado salvo no seu perfil! 🏆" 
