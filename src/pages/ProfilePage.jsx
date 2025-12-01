@@ -8,7 +8,6 @@ function ProfilePage() {
   const [stats, setStats] = useState({ gamesPlayed: 0, wins: 0 });
   const [loading, setLoading] = useState(true);
   
-  // Ref para o input de arquivo escondido
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -20,7 +19,6 @@ function ProfilePage() {
     }
   }, [user]);
 
-  // Quando o usuário seleciona o arquivo, já faz o upload direto
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -29,9 +27,9 @@ function ProfilePage() {
     formData.append('avatar', file);
 
     try {
-        setLoading(true); // Mostra loading rápido enquanto sobe
+        setLoading(true);
         const res = await api.put(`/users/${user.id}/avatar`, formData);
-        updateUser(res.data); // Atualiza o contexto global e a imagem na tela
+        updateUser(res.data);
         alert('Foto atualizada com sucesso!');
     } catch (err) {
         console.error(err);
@@ -41,12 +39,10 @@ function ProfilePage() {
     }
   };
 
-  // Função para abrir o seletor de arquivos ao clicar na foto
   const handleAvatarClick = () => {
     fileInputRef.current.click();
   };
 
-  // Cálculo de Porcentagem de Vitória (evita divisão por zero)
   const winRate = stats.gamesPlayed > 0 
     ? Math.round((stats.wins / stats.gamesPlayed) * 100) 
     : 0;
@@ -56,10 +52,8 @@ function ProfilePage() {
   return (
     <div className="profile-container">
       
-      {/* --- CARTÃO DO USUÁRIO --- */}
       <div className="profile-header-card">
         
-        {/* Input escondido */}
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -68,7 +62,6 @@ function ProfilePage() {
           onChange={handleFileChange} 
         />
 
-        {/* Avatar com Overlay de Edição */}
         <div className="avatar-wrapper" onClick={handleAvatarClick} title="Alterar foto">
           <img 
             src={user.avatarUrl || "https://via.placeholder.com/150?text=User"} 
@@ -76,7 +69,7 @@ function ProfilePage() {
             className="profile-avatar-img"
           />
           <div className="avatar-overlay">
-            📷 {/* Ícone de câmera (pode usar FontAwesome se tiver) */}
+            📷 
           </div>
         </div>
 
@@ -89,7 +82,6 @@ function ProfilePage() {
         </div>
       </div>
 
-      {/* --- GRID DE ESTATÍSTICAS --- */}
       <div className="stats-grid">
         <div className="stat-card blue">
           <h3>Partidas Jogadas</h3>
