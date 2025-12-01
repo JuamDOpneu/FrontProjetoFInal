@@ -60,7 +60,6 @@ function AdminCardListPage() {
           <p>Clique em "+ Nova Carta" para começar.</p>
         </div>
       ) : (
-        /* AQUI ESTÁ A MUDANÇA: Usamos a Grid em vez de Tabela */
         <div className="admin-card-grid">
           {cards.map((card) => (
             <div key={card.id} className="admin-card-item">
@@ -78,7 +77,7 @@ function AdminCardListPage() {
                 <span className="admin-card-theme">{card.theme}</span>
               </div>
 
-              {/* Botões de Ação */}
+              {/* Botões de Ação */
               <div className="admin-card-actions">
                 <Button 
                   variant="primary" 
