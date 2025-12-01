@@ -1,4 +1,4 @@
-import api from './api'; // Sua instância do axios
+import api from './api'; 
 
 export const getCards = (params) => api.get('/cards', { params });
 export const getCardById = (id) => api.get(`/cards/${id}`);
@@ -15,5 +15,5 @@ export const updateCard = (id, formData) => {
 
 export const deleteCard = (id) => api.delete(`/cards/${id}`);
 
-// ... suas outras funções (getDistinctThemes, etc)
+
 export const getDistinctThemes = () => api.get('/cards/themes');
