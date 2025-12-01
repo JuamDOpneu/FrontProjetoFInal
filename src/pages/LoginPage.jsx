@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom'; // <--- Importe o Link
+import { useNavigate, Link } from 'react-router-dom';
 import Button from '../components/Button';
 import Input from '../components/Input';
 
@@ -44,7 +44,6 @@ function LoginPage() {
         </div>
       </form>
 
-      {/* --- Link para Cadastro --- */}
       <div style={{marginTop: '2rem', textAlign: 'center', fontSize: '0.9rem'}}>
         <p>Não é cadastrado?</p>
         <Link 
