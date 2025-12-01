@@ -1,17 +1,17 @@
 import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../contexts/AuthContext'; // <--- Importar o contexto
+import { AuthContext } from '../contexts/AuthContext';
 import Button from '../components/Button';
 
 function HomePage() {
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext); // <--- Pegar o status do usuário
+  const { user } = useContext(AuthContext);
 
   const handlePlayClick = () => {
     if (user) {
-      navigate('/game'); // Se logado, vai pro jogo
+      navigate('/game');
     } else {
-      navigate('/login'); // Se não, vai pro login
+      navigate('/login');
     }
   };
 
@@ -21,9 +21,8 @@ function HomePage() {
       <p>Exercite seu cérebro e divirta-se encontrando os pares!</p>
       
       <div style={{marginTop: '2rem'}}>
-        {/* Renderização Condicional do Botão */}
         <Button 
-          variant={user ? "success" : "primary"} // Verde se puder jogar, Azul se precisar logar
+          variant={user ? "success" : "primary"}
           onClick={handlePlayClick}
           style={{ fontSize: '1.2rem', padding: '1rem 2rem' }}
         >
